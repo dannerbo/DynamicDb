@@ -8,7 +8,7 @@
 		<copyright>Copyright © Daniel Broetzmann 2018</copyright>
 		<tags>db database dal sql query repository crud orm</tags>
 		<projectUrl>http://github.com/dannerbo/DynamicDb</projectUrl>
-		<iconUrl>http://github.com/dannerbo/DynamicDb/DynamicDb-nuget-icon.png</iconUrl>
+		<iconUrl>https://github.com/dannerbo/DynamicDb/blob/master/DynamicDb-nuget-icon.png</iconUrl>
 		<frameworkAssemblies>
 			<frameworkAssembly assemblyName="Microsoft.CSharp"  />
 		</frameworkAssemblies>
