@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 
 namespace DynamicDb
 {
@@ -9,6 +10,11 @@ namespace DynamicDb
 
 		public TestDb(string connectionString)
 			: base(connectionString)
+		{
+		}
+
+		public TestDb(SqlConnection connection)
+			: base(connection)
 		{
 		}
 
