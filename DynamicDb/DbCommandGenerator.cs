@@ -30,7 +30,7 @@ namespace DynamicDb
 		protected SqlConnection DbConnection { get; private set; }
 		protected Cache CachedData { get; private set; }
 
-		public IDbCommand GenerateInsert(string table, params object[] records)
+		public SqlCommand GenerateInsert(string table, params object[] records)
 		{
 			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
 			ExceptionHelper.ThrowIf(() => records == null, () => new ArgumentNullException(nameof(records)));
@@ -47,7 +47,7 @@ namespace DynamicDb
 
 			var properties = records.First().GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
 			var columnsDelimited = String.Join(", ", properties.Select(p => p.Name));
-			var insertValuesDelimited = this.GenerateDelimitedInsertValues(records, properties);
+			var insertValuesDelimited = this.GenerateDelimitedInsertValues(records, properties, out var parameters);
 
 			var commandTextStringBuilder = new StringBuilder()
 				.AppendLine(declareTempTable)
@@ -63,10 +63,17 @@ namespace DynamicDb
 				commandTextStringBuilder.AppendLine(joinTableToTempTable);
 			}
 
-			return new SqlCommand(commandTextStringBuilder.ToString());
+			var command = new SqlCommand(commandTextStringBuilder.ToString());
+
+			if (parameters?.Length > 0)
+			{
+				command.Parameters.AddRange(parameters);
+			}
+
+			return command;
 		}
 
-		public IDbCommand GenerateSelect(string table, object criteria)
+		public SqlCommand GenerateSelect(string table, params object[] criteria)
 		{
 			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
 			ExceptionHelper.ThrowIf(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
@@ -75,21 +82,21 @@ namespace DynamicDb
 				.AppendLine("SELECT *")
 				.AppendLine($"FROM {table}");
 
-			IDbDataParameter[] parameters = null;
+			SqlParameter[] parameters = null;
 
-			if (criteria != null)
+			if (criteria?.Length > 0)
 			{
-				var whereConditions = this.GetWhereConditions(criteria, out parameters);
+				var whereConditions = this.GenerateWhereConditions(criteria, out parameters);
 
 				if (!String.IsNullOrEmpty(whereConditions))
 				{
 					commandTextStringBuilder.AppendLine($"WHERE {whereConditions}");
 				}
 			}
-
+			
 			var command = new SqlCommand(commandTextStringBuilder.ToString());
 
-			if (parameters != null)
+			if (parameters?.Length > 0)
 			{
 				command.Parameters.AddRange(parameters);
 			}
@@ -97,7 +104,7 @@ namespace DynamicDb
 			return command;
 		}
 
-		public IDbCommand GenerateDelete(string table, object criteria)
+		public SqlCommand GenerateDelete(string table, params object[] criteria)
 		{
 			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
 			ExceptionHelper.ThrowIf(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
@@ -116,16 +123,13 @@ namespace DynamicDb
 				.AppendLine($"DELETE {table}")
 				.AppendLine(outputIntoTempTable);
 
-			IDbDataParameter[] parameters = null;
+			SqlParameter[] parameters = null;
 
-			if (criteria != null)
+			if (criteria?.Length > 0)
 			{
-				var whereConditions = this.GetWhereConditions(criteria, out parameters);
+				var whereConditions = this.GenerateWhereConditions(criteria, out parameters);
 
-				if (!String.IsNullOrEmpty(whereConditions))
-				{
-					commandTextStringBuilder.AppendLine($"WHERE {whereConditions}");
-				}
+				commandTextStringBuilder.AppendLine($"WHERE {whereConditions}");
 			}
 
 			commandTextStringBuilder
@@ -136,10 +140,10 @@ namespace DynamicDb
 			{
 				commandTextStringBuilder.AppendLine(joinTableToTempTable);
 			}
-			
+
 			var command = new SqlCommand(commandTextStringBuilder.ToString());
 
-			if (parameters != null)
+			if (parameters?.Length > 0)
 			{
 				command.Parameters.AddRange(parameters);
 			}
@@ -147,41 +151,7 @@ namespace DynamicDb
 			return command;
 		}
 
-		public IDbCommand GenerateDelete(string table, params object[] records)
-		{
-			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
-			ExceptionHelper.ThrowIf(() => records == null, () => new ArgumentNullException(nameof(records)));
-			ExceptionHelper.ThrowIf(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
-			ExceptionHelper.ThrowIf(() => records.Length == 0, () => new ArgumentException("There were no records provided.", nameof(records)));
-
-			this.GenerateOutputTempTableArtifacts(
-				table,
-				true,
-				out var declareTempTable,
-				out var outputIntoTempTable,
-				out var selectFromTempTable,
-				out var joinTableToTempTable);
-
-			var whereConditions = this.GetWhereConditions(table, records);
-
-			var commandTextStringBuilder = new StringBuilder()
-				.AppendLine(declareTempTable)
-				.AppendLine()
-				.AppendLine($"DELETE {table}")
-				.AppendLine(outputIntoTempTable)
-				.AppendLine($"WHERE {whereConditions}")
-				.AppendLine()
-				.AppendLine(selectFromTempTable);
-
-			if (joinTableToTempTable != null)
-			{
-				commandTextStringBuilder.AppendLine(joinTableToTempTable);
-			}
-
-			return new SqlCommand(commandTextStringBuilder.ToString());
-		}
-
-		public IDbCommand GenerateUpdate(string table, object values, object criteria)
+		public SqlCommand GenerateUpdate(string table, object values, params object[] criteria)
 		{
 			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
 			ExceptionHelper.ThrowIf(() => values == null, () => new ArgumentNullException(nameof(values)));
@@ -195,7 +165,7 @@ namespace DynamicDb
 				out var selectFromTempTable,
 				out var joinTableToTempTable);
 
-			var setValues = this.GetSetValues(values, out var setParameters);
+			var setValues = this.GenerateSetValues(values, out var setParameters);
 
 			var commandTextStringBuilder = new StringBuilder()
 				.AppendLine(declareTempTable)
@@ -204,11 +174,11 @@ namespace DynamicDb
 				.AppendLine($"SET {setValues}")
 				.AppendLine(outputIntoTempTable);
 
-			IDbDataParameter[] whereParameters = null;
+			SqlParameter[] whereParameters = null;
 
-			if (criteria != null)
+			if (criteria?.Length > 0)
 			{
-				var whereConditions = this.GetWhereConditions(criteria, out whereParameters);
+				var whereConditions = this.GenerateWhereConditions(criteria, out whereParameters);
 
 				if (!String.IsNullOrEmpty(whereConditions))
 				{
@@ -229,7 +199,7 @@ namespace DynamicDb
 
 			command.Parameters.AddRange(setParameters);
 
-			if (whereParameters != null)
+			if (whereParameters?.Length > 0)
 			{
 				command.Parameters.AddRange(whereParameters);
 			}
@@ -237,7 +207,7 @@ namespace DynamicDb
 			return command;
 		}
 
-		public IDbCommand Generate(string commandText, object parameters, CommandType commandType)
+		public SqlCommand Generate(string commandText, object parameters, CommandType commandType)
 		{
 			ExceptionHelper.ThrowIf(() => commandText == null, () => new ArgumentNullException(nameof(commandText)));
 			ExceptionHelper.ThrowIf(() => commandText.Length == 0, () => new ArgumentException("Command text was not provided.", nameof(commandText)));
@@ -268,52 +238,6 @@ namespace DynamicDb
 			}
 
 			return command;
-		}
-		
-		protected string GetQualifiedColumnValue(PropertyInfo property, object record)
-		{
-			object propertyValue = null;
-
-			try
-			{
-				propertyValue = property?.GetValue(record);
-			}
-			catch (TargetException targetException)
-			{
-				throw new InvalidOperationException("Error getting column value from record.  Make sure all records have identical columns.", targetException);
-			}
-
-			if (propertyValue != null)
-			{
-				var propertyType = propertyValue.GetType();
-				var underlyingType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
-
-				if (underlyingType == typeof(string) || underlyingType == typeof(DateTime))
-				{
-					if (underlyingType == typeof(string))
-					{
-						propertyValue = ((string)propertyValue).Replace("'", "''");
-					}
-
-					return $"'{propertyValue}'";
-				}
-				else if (underlyingType == typeof(bool))
-				{
-					return (bool)propertyValue ? "1" : "0";
-				}
-				else if (underlyingType.IsEnum)
-				{
-					return ((int)propertyValue).ToString();
-				}
-				else
-				{
-					return propertyValue.ToString();
-				}
-			}
-			else
-			{
-				return "NULL";
-			}
 		}
 
 		protected string GenerateDelimitedColumnDefinitions(IEnumerable<SqlColumn> columns)
@@ -403,42 +327,62 @@ namespace DynamicDb
 			return delimitedColumnDefinitions.ToString();
 		}
 
-		protected string GenerateDelimitedInsertValues(object[] records, PropertyInfo[] properties)
+		protected string GenerateDelimitedInsertValues(object[] records, PropertyInfo[] properties, out SqlParameter[] parameters)
 		{
+			var parameterList = new List<SqlParameter>();
 			var insertValuesStringBuilder = new StringBuilder();
 
-			foreach (var record in records)
+			for (int i = 0; i < records.Length; i++)
 			{
+				var record = records[i];
+
 				if (insertValuesStringBuilder.Length > 0)
 				{
 					insertValuesStringBuilder.Append(", ");
 				}
 
-				var delimitedValues = this.GetDelimitedRecordInsertValues(record, properties);
+				insertValuesStringBuilder.Append("(");
 
-				insertValuesStringBuilder.Append($"({delimitedValues})");
-			}
-
-			return insertValuesStringBuilder.ToString();
-		}
-
-		protected string GetDelimitedRecordInsertValues(object record, PropertyInfo[] properties)
-		{
-			var recordInsertValuesStringBuilder = new StringBuilder();
-
-			foreach (var property in properties)
-			{
-				if (recordInsertValuesStringBuilder.Length > 0)
+				for (int j = 0; j < properties.Length; j++)
 				{
-					recordInsertValuesStringBuilder.Append(", ");
+					var property = properties[j];
+
+					if (j > 0)
+					{
+						insertValuesStringBuilder.Append(", ");
+					}
+
+					object propertyValue;
+
+					try
+					{
+						propertyValue = property.GetValue(record);
+					}
+					catch (TargetException targetException)
+					{
+						throw new InvalidOperationException("Error getting column value from record.  Make sure all records have identical columns.", targetException);
+					}
+
+					if (propertyValue != null)
+					{
+						var parameterName = $"{property.Name}_{i}";
+
+						insertValuesStringBuilder.Append($"@{parameterName}");
+
+						parameterList.Add(new SqlParameter(parameterName, propertyValue));
+					}
+					else
+					{
+						insertValuesStringBuilder.Append("NULL");
+					}
 				}
 
-				var qualifiedValue = this.GetQualifiedColumnValue(property, record);
-
-				recordInsertValuesStringBuilder.Append(qualifiedValue);
+				insertValuesStringBuilder.Append(")");
 			}
 
-			return recordInsertValuesStringBuilder.ToString();
+			parameters = parameterList.ToArray();
+
+			return insertValuesStringBuilder.ToString();
 		}
 
 		protected void GenerateOutputTempTableArtifacts(
@@ -503,116 +447,53 @@ namespace DynamicDb
 			return joinConditionsStringBuilder.ToString();
 		}
 
-		protected string GetWhereConditions(object criteria, out IDbDataParameter[] parameters)
+		protected string GenerateWhereConditions(object[] criteria, out SqlParameter[] parameters)
 		{
-			var parameterList = new List<IDbDataParameter>();
+			var parameterList = new List<SqlParameter>();
+			var whereConditionsStringBuilder = new StringBuilder();
 
-			var conditionsStringBuilder = new StringBuilder();
-			var properties = criteria.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-
-			foreach (var property in properties)
+			for (int i = 0; i < criteria.Length; i++)
 			{
-				if (conditionsStringBuilder.Length > 0)
+				var item = criteria[i];
+				var properties = item.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+				
+				whereConditionsStringBuilder.Append(i == 0 ? "(" : " OR (");
+
+				for (int j = 0; j < properties.Length; j++)
 				{
-					conditionsStringBuilder.Append(" AND ");
+					var property = properties[j];
+					var propertyValue = property.GetValue(item);
+
+					if (j > 0)
+					{
+						whereConditionsStringBuilder.Append(" AND ");
+					}
+
+					if (propertyValue != null)
+					{
+						var parameterName = $"{property.Name}_{i}";
+
+						whereConditionsStringBuilder.Append($"{property.Name} = @{parameterName}");
+
+						parameterList.Add(new SqlParameter(parameterName, propertyValue));
+					}
+					else
+					{
+						whereConditionsStringBuilder.Append($"{property.Name} IS NULL");
+					}
 				}
 
-				var propertyValue = property.GetValue(criteria);
-				var parameterName = property.Name;
-
-				if (propertyValue != null)
-				{
-					conditionsStringBuilder.Append($"{property.Name} = @{parameterName}");
-
-					parameterList.Add(new SqlParameter(parameterName, propertyValue));
-				}
-				else
-				{
-					conditionsStringBuilder.Append($"{property.Name} IS NULL");
-				}
+				whereConditionsStringBuilder.Append(")");
 			}
 
 			parameters = parameterList.ToArray();
 
-			return conditionsStringBuilder.ToString();
-		}
-
-		protected string GetWhereConditions(string table, object[] records)
-		{
-			var primaryKeyColumns = this.GetPrimaryKeyColumns(table);
-
-			if (primaryKeyColumns.Count() == 1)
-			{
-				return this.GetWhereConditionsForSingleColumn(table, records);
-			}
-			else
-			{
-				return this.GetWhereConditionsForMultipleColumns(table, records);
-			}
-		}
-
-		protected string GetWhereConditionsForSingleColumn(string table, object[] records)
-		{
-			var whereConditionsStringBuilder = new StringBuilder();
-			var primaryKeyColumns = this.GetPrimaryKeyColumns(table);
-			var primaryKeyProperty = records.First().GetType().GetProperty(primaryKeyColumns.Single());
-
-			whereConditionsStringBuilder.Append($"{primaryKeyProperty.Name} IN (");
-
-			foreach (var record in records)
-			{
-				var primaryKeyValue = this.GetQualifiedColumnValue(primaryKeyProperty, record);
-
-				whereConditionsStringBuilder.Append(primaryKeyValue).Append(", ");
-			}
-
-			whereConditionsStringBuilder.Length -= 2;
-			whereConditionsStringBuilder.Append(")");
-
 			return whereConditionsStringBuilder.ToString();
 		}
-
-		protected string GetWhereConditionsForMultipleColumns(string table, object[] records)
+		
+		protected string GenerateSetValues(object values, out SqlParameter[] parameters)
 		{
-			var whereConditionsStringBuilder = new StringBuilder();
-			var primaryKeyColumns = this.GetPrimaryKeyColumns(table);
-			var properties = records.First().GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance).AsEnumerable();
-
-			if (primaryKeyColumns.Count() > 0)
-			{
-				properties = properties.Where(p => primaryKeyColumns.Contains(p.Name));
-			}
-
-			foreach (var record in records)
-			{
-				whereConditionsStringBuilder.Append("(");
-
-				foreach (var property in properties)
-				{
-					var columnValue = this.GetQualifiedColumnValue(property, record);
-
-					if (columnValue != "NULL")
-					{
-						whereConditionsStringBuilder.Append($"{property.Name} = {columnValue} AND ");
-					}
-					else
-					{
-						whereConditionsStringBuilder.Append($"{property.Name} IS NULL AND ");
-					}
-				}
-
-				whereConditionsStringBuilder.Length -= 5;
-				whereConditionsStringBuilder.Append(") OR ");
-			}
-
-			whereConditionsStringBuilder.Length -= 4;
-
-			return whereConditionsStringBuilder.ToString();
-		}
-
-		protected string GetSetValues(object values, out IDbDataParameter[] parameters)
-		{
-			var parameterList = new List<IDbDataParameter>();
+			var parameterList = new List<SqlParameter>();
 			var setValuesStringBuilder = new StringBuilder();
 			var properties = values.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
@@ -624,11 +505,19 @@ namespace DynamicDb
 				}
 
 				var propertyValue = property.GetValue(values);
-				var parameterName = $"set_{property.Name}";
 
-				setValuesStringBuilder.Append($"{property.Name} = @{parameterName}");
+				if (propertyValue != null)
+				{
+					var parameterName = $"set_{property.Name}";
 
-				parameterList.Add(new SqlParameter(parameterName, propertyValue ?? DBNull.Value));
+					setValuesStringBuilder.Append($"{property.Name} = @{parameterName}");
+
+					parameterList.Add(new SqlParameter(parameterName, propertyValue ?? DBNull.Value));
+				}
+				else
+				{
+					setValuesStringBuilder.Append($"{property.Name} = NULL");
+				}
 			}
 
 			parameters = parameterList.ToArray();
@@ -672,7 +561,7 @@ namespace DynamicDb
 
 				using (var command = new SqlCommand(commandText, this.DbConnection))
 				{
-					command.Parameters.AddWithValue("Schema", schema != null ? schema : (object)DBNull.Value);
+					command.Parameters.AddWithValue("Schema", schema ?? (object)DBNull.Value);
 					command.Parameters.AddWithValue("Table", tableWithoutSchema);
 
 					using (var reader = command.ExecuteReader())
@@ -702,13 +591,6 @@ namespace DynamicDb
 			}
 
 			return columnDefinitions;
-		}
-
-		protected IEnumerable<string> GetPrimaryKeyColumns(string table)
-		{
-			var columnDefinitions = this.GetColumnDefinitions(table);
-
-			return columnDefinitions.Where(x => x.IsPrimaryKey).Select(x => x.Name);
 		}
 
 		protected class Cache

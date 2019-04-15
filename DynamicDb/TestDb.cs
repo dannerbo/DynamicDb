@@ -55,14 +55,14 @@ namespace DynamicDb
 
 		private class RecordSet
 		{
-			public RecordSet(string table, IEnumerable<dynamic> records)
+			public RecordSet(string table, dynamic[] records)
 			{
 				this.Table = table;
 				this.Records = records;
 			}
 			
 			public string Table { get; private set; }
-			public IEnumerable<dynamic> Records { get; private set; }
+			public dynamic[] Records { get; private set; }
 		}
 	}
 }

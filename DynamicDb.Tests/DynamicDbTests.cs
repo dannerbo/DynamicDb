@@ -2,6 +2,7 @@
 using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
+using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -145,6 +146,57 @@ namespace DynamicDb.Tests
 
 				Assert.AreEqual(1, selectedRecords.Length);
 				DynamicDbTests.AssertPersonRecordMatches(records[0], selectedRecords[0]);
+			}
+		}
+
+		[TestMethod]
+		public void Select_MultipleCriteriaAreProvided_FilteredRowsAreReturned()
+		{
+			var records = new dynamic[]
+			{
+				new
+				{
+					FirstName = "John",
+					LastName = "Doe",
+					MiddleInitial = "A",
+					Age = 50,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Male
+				},
+
+				new
+				{
+					FirstName = "Jane",
+					LastName = "Doe",
+					MiddleInitial = "M",
+					Age = 40,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Female
+				},
+
+				new
+				{
+					FirstName = "Bruce",
+					LastName = "Wayne",
+					MiddleInitial = "X",
+					Age = 30,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Male
+				}
+			};
+
+			DynamicDbTests.InsertPersonRecords(records);
+
+			using (var dynamicDb = new DynamicDb(DynamicDbTests.DbConnectionString))
+			{
+				var selectedRecords = dynamicDb.Select("dbo.Person",
+					new { FirstName = "John" },
+					new { FirstName = "Jane", LastName = "Doe" });
+
+				Assert.AreEqual(2, selectedRecords.Length);
+
+				selectedRecords.Single(x => x.FirstName == "John");
+				selectedRecords.Single(x => x.FirstName == "Jane");
 			}
 		}
 
@@ -572,6 +624,81 @@ namespace DynamicDb.Tests
 		}
 
 		[TestMethod]
+		public void Update_MultipleColumnValuesAreProvidedAndMultipleCriteriaAreProvided_FilteredRowsAreUpdatedAndReturned()
+		{
+			var records = new dynamic[]
+			{
+				new
+				{
+					FirstName = "John",
+					LastName = "Doe",
+					MiddleInitial = "A",
+					Age = 50,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Male
+				},
+
+				new
+				{
+					FirstName = "Jane",
+					LastName = "Doe",
+					MiddleInitial = "M",
+					Age = 40,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Female
+				},
+
+				new
+				{
+					FirstName = "Bruce",
+					LastName = "Wayne",
+					MiddleInitial = "X",
+					Age = 30,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Male
+				}
+			};
+
+			var recordsWithUpdatedValues = new dynamic[]
+			{
+				new
+				{
+					FirstName = "John",
+					LastName = "Doe",
+					MiddleInitial = "A",
+					Age = 30,
+					DateOfBirth = DateTime.Parse("2001-01-01"),
+					Gender = Gender.Male
+				},
+
+				new
+				{
+					FirstName = "Jane",
+					LastName = "Doe",
+					MiddleInitial = "M",
+					Age = 30,
+					DateOfBirth = DateTime.Parse("2001-01-01"),
+					Gender = Gender.Female
+				}
+			};
+
+			DynamicDbTests.InsertPersonRecords(records);
+
+			using (var dynamicDb = new DynamicDb(DynamicDbTests.DbConnectionString))
+			{
+				var updatedRecords = dynamicDb.Update(
+					"dbo.Person",
+					new { Age = 30, DateOfBirth = DateTime.Parse("2001-01-01") },
+					new { FirstName = "John" }, new { FirstName = "Jane", LastName = "Doe" });
+
+				Assert.AreEqual(2, updatedRecords.Length);
+				Assert.IsNotNull(updatedRecords[0].UpdatedDate);
+				Assert.IsNotNull(updatedRecords[1].UpdatedDate);
+				DynamicDbTests.AssertPersonRecordsExistAndMatch(recordsWithUpdatedValues);
+			}
+		}
+
+		[TestMethod]
 		[ExpectedException(typeof(SqlException))]
 		public void Update_InvalidDataType_ExceptionIsThrown()
 		{
@@ -691,7 +818,7 @@ namespace DynamicDb.Tests
 		}
 
 		[TestMethod]
-		public void Delete_MultipleCriteriaAreProvided_FilteredRowIsUpdatedAndReturned()
+		public void Delete_MultipleCriteriaAreProvided_FilteredRowIsDeletedAndReturned()
 		{
 			var records = new dynamic[]
 			{
@@ -726,6 +853,56 @@ namespace DynamicDb.Tests
 				DynamicDbTests.AssertPersonRecordMatches(records[1], deletedRecords[0]);
 				DynamicDbTests.AssertPersonRecordsDoNotExist(2);
 				DynamicDbTests.AssertPersonRecordsExist(1);
+			}
+		}
+
+		[TestMethod]
+		public void Delete_MultipleCriteriaAreProvided2_FilteredRowIsDeletedAndReturned()
+		{
+			var records = new dynamic[]
+			{
+				new
+				{
+					FirstName = "John",
+					LastName = "Doe",
+					MiddleInitial = "A",
+					Age = 50,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Male
+				},
+
+				new
+				{
+					FirstName = "Jane",
+					LastName = "Doe",
+					MiddleInitial = "M",
+					Age = 40,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Female
+				},
+
+				new
+				{
+					FirstName = "Bruce",
+					LastName = "Wayne",
+					MiddleInitial = "X",
+					Age = 30,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Male
+				}
+			};
+
+			DynamicDbTests.InsertPersonRecords(records);
+
+			using (var dynamicDb = new DynamicDb(DynamicDbTests.DbConnectionString))
+			{
+				var deletedRecords = dynamicDb.Delete("dbo.Person",
+					new { FirstName = "John" },
+					new { FirstName = "Jane", LastName = "Doe" });
+
+				Assert.AreEqual(2, deletedRecords.Length);
+				DynamicDbTests.AssertPersonRecordsDoNotExist(1, 2);
+				DynamicDbTests.AssertPersonRecordsExist(3);
 			}
 		}
 

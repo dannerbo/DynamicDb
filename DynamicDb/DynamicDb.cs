@@ -38,7 +38,7 @@ namespace DynamicDb
 			}
 		}
 
-		public dynamic[] Select(string table, object criteria)
+		public dynamic[] Select(string table, params object[] criteria)
 		{
 			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
 			ExceptionHelper.ThrowIf(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
@@ -48,8 +48,8 @@ namespace DynamicDb
 				return this.ExecuteReader(command, (recordFactory, reader) => recordFactory.Create(reader, table));
 			}
 		}
-
-		public dynamic[] Delete(string table, object criteria)
+		
+		public dynamic[] Delete(string table, params object[] criteria)
 		{
 			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
 			ExceptionHelper.ThrowIf(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
@@ -60,28 +60,7 @@ namespace DynamicDb
 			}
 		}
 
-		public dynamic[] Delete(string table, params object[] records)
-		{
-			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
-			ExceptionHelper.ThrowIf(() => records == null, () => new ArgumentNullException(nameof(records)));
-			ExceptionHelper.ThrowIf(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
-			ExceptionHelper.ThrowIf(() => records.Length == 0, () => new ArgumentException("There were no records provided.", nameof(records)));
-
-			using (var command = this.CommandGenerator.GenerateDelete(table, records))
-			{
-				return this.ExecuteReader(command, (recordFactory, reader) => recordFactory.Create(reader, table));
-			}
-		}
-
-		public dynamic[] Delete(string table, IEnumerable<dynamic> records)
-		{
-			ExceptionHelper.ThrowIf(() => records == null, () => new ArgumentNullException(nameof(records)));
-			ExceptionHelper.ThrowIf(() => records.Count() == 0, () => new ArgumentException("There were no records provided.", nameof(records)));
-
-			return this.Delete(table, records.Select(x => (object)x).ToArray());
-		}
-
-		public dynamic[] Update(string table, object values, object criteria)
+		public dynamic[] Update(string table, object values, params object[] criteria)
 		{
 			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
 			ExceptionHelper.ThrowIf(() => values == null, () => new ArgumentNullException(nameof(values)));
