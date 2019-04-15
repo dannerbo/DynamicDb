@@ -15,7 +15,7 @@ In this example we will select all rows from the **dbo.Person** table and print 
 ```csharp
 using (var dynamicDb = new DynamicDb(connectionStringOrConnection))
 {
-    var records = dynamicDb.Select("dbo.Person", criteria: null);
+    var records = dynamicDb.Select("dbo.Person");
 
     foreach (var record in records)
     {
@@ -31,7 +31,18 @@ In this example we will select all **dbo.Person** records where the **FirstName*
 ```csharp
 using (var dynamicDb = new DynamicDb(connectionStringOrConnection))
 {
-    var records = dynamicDb.Select("dbo.Person", criteria: new { FirstName = "John" });
+    var records = dynamicDb.Select("dbo.Person", new { FirstName = "John" });
+}
+```
+
+### Select filtered rows from a table via multiple criteria
+
+In this example we will select all **dbo.Person** records where the **FirstName** is equal to **John** or the **LastName** is equal to **Doe** and **Age** is equal to **40**.  Each criteria object translates to an **OR** condition, and each condition within each criteria object tranlsates to an **AND** condition.
+
+```csharp
+using (var dynamicDb = new DynamicDb(connectionStringOrConnection))
+{
+    var records = dynamicDb.Select("dbo.Person", new { FirstName = "John" }, new { LastName = "Doe", Age = 40 });
 }
 ```
 
@@ -72,16 +83,16 @@ using (var dynamicDb = new DynamicDb(connectionStringOrConnection))
 
 ### Update rows in a table
 
-In this example we will update the **Age** field to **30** on all **dbo.Person** records where the first name equals **John** and print the affected records to the console.  Make notice that the new field values and criteria can be provided via anonymous types.  Also make notice that dynamic objects are returned for all the updated records with all the fields from the table with their updated values.
+In this example we will update the **Age** field to **30** on all **dbo.Person** records where the first name equals **John** and print the affected records to the console.  Make notice that the new field values and criteria can be provided via anonymous types.  Also make notice that dynamic objects are returned for all the updated records with all the fields from the table with their updated values.  Multiple criteria can also be supplied.
 
 ```csharp
 using (var dynamicDb = new DynamicDb(connectionStringOrConnection))
 {
-    var records = dynamicDb.Update("dbo.Person", values: new { Age = 30 }, criteria: new { FirstName = "John" });
+    var records = dynamicDb.Update("dbo.Person", new { Age = 30 }, new { FirstName = "John" });
 
     foreach (var record in records)
     {
-        // **UpdatedDate** is updated by an **UPDATE** trigger
+        // UpdatedDate is updated by an UPDATE trigger
         Console.WriteLine($"{record.Id}, {record.FirstName}, {record.LastName}, {record.Age}, {record.UpdatedDate}");
     }
 }
@@ -89,12 +100,12 @@ using (var dynamicDb = new DynamicDb(connectionStringOrConnection))
 
 ### Delete rows in a table
 
-In this example we will delete all **dbo.Person** records where the first name equals **John** and print the affected records to the console.  Make notice that the criteria can be provided via anonymous types.  Also make notice that dynamic objects are returned for all the deleted records with all the fields from the table.
+In this example we will delete all **dbo.Person** records where the first name equals **John** and print the affected records to the console.  Make notice that the criteria can be provided via anonymous types.  Also make notice that dynamic objects are returned for all the deleted records with all the fields from the table.  Mutliple criteria can also be supplied.
 
 ```csharp
 using (var dynamicDb = new DynamicDb(connectionStringOrConnection))
 {
-    var records = dynamicDb.Delete("dbo.Person", criteria: new { FirstName = "John" });
+    var records = dynamicDb.Delete("dbo.Person", new { FirstName = "John" });
 
     foreach (var record in records)
     {
@@ -243,12 +254,12 @@ In this example we will write a unit test to verify an **Insert** method for a r
 [TestMethod]
 public void Insert_InsertAddressForExistingPerson_AddressIsInserted()
 {
-    // Connection or connection string should be for a "unit tester" user who permissions to perform the **TestDb** actions
+    // Connection or connection string should be for a "unit tester" user who permissions to perform the TestDb actions
     using (var testDb = new TestDb(connectionStringOrConnectionForUnitTestUser))
     {
         // Insert temporary **dbo.Person** record that will be referenced by the **dbo.Address** record that we're going to insert via the repository
         var person = testDb.Insert("dbo.Person",
-            true, // Specify **true** for **deleteOnDispose** so these records are automatically deleted when **TestDb** is disposed
+            true, // Specify true for deleteOnDispose so these records are automatically deleted when TestDb is disposed
             new
             {
                 FirstName = "John",
@@ -261,7 +272,7 @@ public void Insert_InsertAddressForExistingPerson_AddressIsInserted()
 
         var address = new Models.Address()
         {
-            PersonId = person.Id, // Auto-identity from inserted **dbo.Person** record above
+            PersonId = person.Id, // Auto-identity from inserted dbo.Person record above
             Street = "123 Fake St.",
             City = "Nuketown",
             State = "WI",
@@ -274,7 +285,7 @@ public void Insert_InsertAddressForExistingPerson_AddressIsInserted()
         addressRepository.Insert(address);
         
         // Delete and return the record we expect to have been inserted
-        var addressRecord = testDb.Delete("dbo.Address", criteria: new { PersonId = person.Id }).Single();
+        var addressRecord = testDb.Delete("dbo.Address", new { PersonId = person.Id }).Single();
         
         Assert.AreEqual(address.Street, addressRecord.Street);
         Assert.AreEqual(address.City, addressRecord.City);
