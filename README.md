@@ -257,7 +257,7 @@ public void Insert_InsertAddressForExistingPerson_AddressIsInserted()
     // Connection or connection string should be for a "unit tester" user who permissions to perform the TestDb actions
     using (var testDb = new TestDb(connectionStringOrConnectionForUnitTestUser))
     {
-        // Insert temporary **dbo.Person** record that will be referenced by the **dbo.Address** record that we're going to insert via the repository
+        // Insert temporary dbo.Person record that will be referenced by the dbo.Address record that we're going to insert via the repository
         var person = testDb.Insert("dbo.Person",
             true, // Specify true for deleteOnDispose so these records are automatically deleted when TestDb is disposed
             new
