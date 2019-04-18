@@ -47,6 +47,8 @@
     <Compile Include="ExceptionHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RecordFactory.cs" />
+    <Compile Include="SqlColumn.cs" />
+    <Compile Include="TableMetadataProvider.cs" />
     <Compile Include="TestDb.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.Linq;
 
 namespace DynamicDb
 {
@@ -10,6 +9,7 @@ namespace DynamicDb
 	{
 		private SqlConnection connection;
 		private DbCommandGenerator commandGenerator;
+		private TableMetadataProvider tableMetadataProvider;
 
 		public DynamicDb(string connectionString)
 		{
@@ -23,6 +23,7 @@ namespace DynamicDb
 
 		protected string ConnectionString { get; private set; }
 		protected SqlConnection Connection => this.GetOrCreateConnection();
+		protected TableMetadataProvider TableMetadataProvider => this.GetOrCreateTableMetadataProvider();
 		protected DbCommandGenerator CommandGenerator => this.GetOrCreateCommandGenerator();
 
 		public dynamic[] Insert(string table, params object[] records)
@@ -100,8 +101,8 @@ namespace DynamicDb
 		{
 			var records = new List<dynamic>();
 			var recordFactory = new RecordFactory(this.ConnectionString);
-			
-			command.Connection = this.GetOrCreateConnection();
+
+			command.Connection = this.Connection;
 
 			using (var reader = command.ExecuteReader())
 			{
@@ -129,18 +130,16 @@ namespace DynamicDb
 			return this.connection;
 		}
 
+		protected virtual TableMetadataProvider GetOrCreateTableMetadataProvider()
+		{
+			return this.tableMetadataProvider ?? (this.tableMetadataProvider = new TableMetadataProvider(this.Connection));
+		}
+
 		protected virtual DbCommandGenerator GetOrCreateCommandGenerator()
 		{
-			if (this.commandGenerator == null)
-			{
-				var connection = this.GetOrCreateConnection();
-
-				this.commandGenerator = new DbCommandGenerator(connection);
-			}
-
-			return this.commandGenerator;
+			return this.commandGenerator ?? (this.commandGenerator = new DbCommandGenerator(this.TableMetadataProvider));
 		}
-		
+
 		public void Dispose()
 		{
 			this.Dispose(true);

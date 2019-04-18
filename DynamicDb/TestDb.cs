@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Data.SqlClient;
 
 namespace DynamicDb
@@ -7,7 +6,7 @@ namespace DynamicDb
 	public class TestDb : DynamicDb
 	{
 		private Stack<RecordSet> insertedRecordsCache = new Stack<RecordSet>();
-
+		
 		public TestDb(string connectionString)
 			: base(connectionString)
 		{
@@ -30,6 +29,21 @@ namespace DynamicDb
 			return insertedRecords;
 		}
 
+		protected virtual void DeleteInsertedRecords()
+		{
+			while (this.insertedRecordsCache.Count > 0)
+			{
+				var recordSet = this.insertedRecordsCache.Pop();
+				
+				using (var command = this.CommandGenerator.GenerateDeleteByPrimaryKeys(recordSet.Table, recordSet.Records))
+				{
+					command.Connection = this.Connection;
+
+					command.ExecuteNonQuery();
+				}
+			}
+		}
+
 		protected override void Dispose(bool disposing)
 		{
 			if (disposing)
@@ -43,26 +57,16 @@ namespace DynamicDb
 			base.Dispose(disposing);
 		}
 
-		private void DeleteInsertedRecords()
-		{
-			while (this.insertedRecordsCache.Count > 0)
-			{
-				var recordSet = this.insertedRecordsCache.Pop();
-
-				this.Delete(recordSet.Table, recordSet.Records);
-			}
-		}
-
 		private class RecordSet
 		{
-			public RecordSet(string table, dynamic[] records)
+			public RecordSet(string table, object[] records)
 			{
 				this.Table = table;
 				this.Records = records;
 			}
-			
+
 			public string Table { get; private set; }
-			public dynamic[] Records { get; private set; }
+			public object[] Records { get; private set; }
 		}
 	}
 }
