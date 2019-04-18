@@ -2,7 +2,7 @@
 <package  xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
 	<metadata>
 		<id>DynamicDb</id>
-		<version>3.0.0</version>
+		<version>3.1.0</version>
 		<authors>Daniel Broetzmann</authors>
 		<description>DynamicDb is a lightweight library with a simple interface that can be used to peform common SQL database operations.  Dynamic SQL is generated behind the scenes and results are mapped to dynamic objects (if applicable).  DynamicDb is best used for unit testing and utility-type applications.</description>
 		<copyright>Copyright © Daniel Broetzmann 2018</copyright>
