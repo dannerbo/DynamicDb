@@ -463,7 +463,8 @@ namespace DynamicDb
 			{
 				var item = criteria[i];
 				var properties = item.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-				
+				var fieldCount = 0;
+
 				whereConditionsStringBuilder.Append(i == 0 ? "(" : " OR (");
 
 				for (int j = 0; j < properties.Length; j++)
@@ -474,7 +475,7 @@ namespace DynamicDb
 					{
 						var propertyValue = property.GetValue(item);
 
-						if (j > 0)
+						if (fieldCount++ > 0)
 						{
 							whereConditionsStringBuilder.Append(" AND ");
 						}
