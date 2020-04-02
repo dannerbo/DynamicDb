@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -8,28 +9,30 @@ namespace DynamicDb
 {
 	public sealed class RecordFactory
 	{
-		private static Dictionary<string, Cache> Caches = new Dictionary<string, Cache>();
-		private string databaseConnectionString;
+		private static Dictionary<SqlConnectionStringBuilder, Cache> Caches = new Dictionary<SqlConnectionStringBuilder, Cache>();
+		private SqlConnectionStringBuilder connectionStringBuilder;
 		private Cache cache;
 
-		private RecordFactory(string databaseConnectionString, Cache cache)
+		private RecordFactory(SqlConnectionStringBuilder connectionStringBuilder, Cache cache)
 		{
-			this.databaseConnectionString = databaseConnectionString;
+			this.connectionStringBuilder = connectionStringBuilder;
 			this.cache = cache;
 		}
 
-		public static RecordFactory Create(string databaseConnectionString)
+		public static RecordFactory Create(string connectionString)
 		{
 			lock (RecordFactory.Caches)
 			{
-				if (!RecordFactory.Caches.TryGetValue(databaseConnectionString, out var cache))
+				var connectionStringBuilder = new SqlConnectionStringBuilder(connectionString);
+
+				if (!RecordFactory.Caches.TryGetValue(connectionStringBuilder, out var cache))
 				{
 					cache = new Cache();
 
-					RecordFactory.Caches.Add(databaseConnectionString, cache);
+					RecordFactory.Caches.Add(connectionStringBuilder, cache);
 				}
 
-				return new RecordFactory(databaseConnectionString, cache);
+				return new RecordFactory(connectionStringBuilder, cache);
 			}
 		}
 
@@ -143,7 +146,7 @@ namespace DynamicDb
 
 		private string GenerateTypeName(string databaseObject)
 		{
-			return databaseObject.Replace('.', '_');
+			return $"{this.connectionStringBuilder.InitialCatalog}_{databaseObject.Replace('.', '_')}";
 		}
 
 		private string GenerateTypeName(IDbCommand command)
