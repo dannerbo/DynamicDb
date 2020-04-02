@@ -33,7 +33,7 @@ namespace DynamicDb
 				out var joinTableToTempTable);
 
 			var properties = records.First().GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-			var columnsDelimited = String.Join(", ", properties.Select(p => p.Name));
+			var columnsDelimited = String.Join(", ", properties.Select(p => $"[{p.Name}]"));
 			var insertValuesDelimited = this.GenerateDelimitedInsertValues(records, properties, out var parameters);
 
 			var commandTextStringBuilder = new StringBuilder()
@@ -280,7 +280,7 @@ namespace DynamicDb
 					case "UNIQUEIDENTIFIER":
 					case "XML":
 					{
-						delimitedColumnDefinitions.Append($"{column.Name} {dataType}");
+						delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}");
 
 						break;
 					}
@@ -288,7 +288,7 @@ namespace DynamicDb
 					case "DECIMAL":
 					case "NUMERIC":
 					{
-						delimitedColumnDefinitions.Append($"{column.Name} {dataType}({column.Precision}, {column.Scale})");
+						delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({column.Precision}, {column.Scale})");
 
 						break;
 					}
@@ -298,14 +298,14 @@ namespace DynamicDb
 					case "FLOAT":
 					case "REAL":
 					{
-						delimitedColumnDefinitions.Append($"{column.Name} {dataType}({column.Precision})");
+						delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({column.Precision})");
 
 						break;
 					}
 
 					case "TIME":
 					{
-						delimitedColumnDefinitions.Append($"{column.Name} {dataType}({column.Scale})");
+						delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({column.Scale})");
 
 						break;
 					}
@@ -319,7 +319,7 @@ namespace DynamicDb
 					{
 						var columnMaximumLength = column.MaximumLength == -1 ? "MAX" : column.MaximumLength.ToString();
 
-						delimitedColumnDefinitions.Append($"{column.Name} {dataType}({columnMaximumLength})");
+						delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({columnMaximumLength})");
 
 						break;
 					}
@@ -410,7 +410,7 @@ namespace DynamicDb
 			declareTempTable = $"DECLARE @Record TABLE ({columnDefinitionsDelimited})";
 
 			var outputValues = isForDelete ? "DELETED" : "INSERTED";
-			var outputColumnsDelimited = String.Join(", ", idColumnDefinitions.Select(c => $"{outputValues}.{c.Name}"));
+			var outputColumnsDelimited = String.Join(", ", idColumnDefinitions.Select(c => $"{outputValues}.[{c.Name}]"));
 
 			outputIntoTempTable = $"OUTPUT {outputColumnsDelimited} INTO @Record";
 
@@ -448,7 +448,7 @@ namespace DynamicDb
 					joinConditionsStringBuilder.Append(" AND ");
 				}
 
-				joinConditionsStringBuilder.Append($"{otherTable}.{column.Name} = {table}.{column.Name}");
+				joinConditionsStringBuilder.Append($"{otherTable}.[{column.Name}] = {table}.[{column.Name}]");
 			}
 
 			return joinConditionsStringBuilder.ToString();
@@ -484,13 +484,13 @@ namespace DynamicDb
 						{
 							var parameterName = $"{property.Name}_{i}";
 
-							whereConditionsStringBuilder.Append($"{property.Name} = @{parameterName}");
+							whereConditionsStringBuilder.Append($"[{property.Name}] = @{parameterName}");
 
 							parameterList.Add(new SqlParameter(parameterName, propertyValue));
 						}
 						else
 						{
-							whereConditionsStringBuilder.Append($"{property.Name} IS NULL");
+							whereConditionsStringBuilder.Append($"[{property.Name}] IS NULL");
 						}
 					}
 				}
@@ -527,7 +527,7 @@ namespace DynamicDb
 				{
 					var parameterName = $"set_{property.Name}";
 
-					setValuesStringBuilder.Append($"{property.Name} = @{parameterName}");
+					setValuesStringBuilder.Append($"[{property.Name}] = @{parameterName}");
 
 					parameterList.Add(new SqlParameter(parameterName, propertyValue ?? DBNull.Value));
 				}

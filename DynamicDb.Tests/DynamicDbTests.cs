@@ -151,6 +151,43 @@ namespace DynamicDb.Tests
 		}
 
 		[TestMethod]
+		public void Select_TableWithBracketsAndCriteriaIsProvided_FilteredRowIsReturned()
+		{
+			var records = new dynamic[]
+			{
+				new
+				{
+					FirstName = "John",
+					LastName = "Doe",
+					MiddleInitial = "A",
+					Age = 50,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Male
+				},
+
+				new
+				{
+					FirstName = "Jane",
+					LastName = "Doe",
+					MiddleInitial = "M",
+					Age = 40,
+					DateOfBirth = DateTime.Parse("2000-01-01"),
+					Gender = Gender.Female
+				}
+			};
+
+			DynamicDbTests.InsertPersonRecords(records);
+
+			using (var dynamicDb = new DynamicDb(DynamicDbTests.DbConnectionString))
+			{
+				var selectedRecords = dynamicDb.Select("[dbo].[Person]", criteria: new { FirstName = "John" });
+
+				Assert.AreEqual(1, selectedRecords.Length);
+				DynamicDbTests.AssertPersonRecordMatches(records[0], selectedRecords[0]);
+			}
+		}
+
+		[TestMethod]
 		public void Select_MultipleCriteriaAreProvided_FilteredRowsAreReturned()
 		{
 			var records = new dynamic[]
