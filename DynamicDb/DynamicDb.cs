@@ -28,10 +28,10 @@ namespace DynamicDb
 
 		public dynamic[] Insert(string table, params object[] records)
 		{
-			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
-			ExceptionHelper.ThrowIf(() => records == null, () => new ArgumentNullException(nameof(records)));
-			ExceptionHelper.ThrowIf(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
-			ExceptionHelper.ThrowIf(() => records.Length == 0, () => new ArgumentException("There were no records provided.", nameof(records)));
+			Throw.If(() => table == null, () => new ArgumentNullException(nameof(table)));
+			Throw.If(() => records == null, () => new ArgumentNullException(nameof(records)));
+			Throw.If(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
+			Throw.If(() => records.Length == 0, () => new ArgumentException("There were no records provided.", nameof(records)));
 
 			using (var command = this.CommandGenerator.GenerateInsert(table, records))
 			{
@@ -41,8 +41,8 @@ namespace DynamicDb
 
 		public dynamic[] Select(string table, params object[] criteria)
 		{
-			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
-			ExceptionHelper.ThrowIf(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
+			Throw.If(() => table == null, () => new ArgumentNullException(nameof(table)));
+			Throw.If(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
 
 			using (var command = this.CommandGenerator.GenerateSelect(table, criteria))
 			{
@@ -52,8 +52,8 @@ namespace DynamicDb
 		
 		public dynamic[] Delete(string table, params object[] criteria)
 		{
-			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
-			ExceptionHelper.ThrowIf(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
+			Throw.If(() => table == null, () => new ArgumentNullException(nameof(table)));
+			Throw.If(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
 
 			using (var command = this.CommandGenerator.GenerateDelete(table, criteria))
 			{
@@ -63,9 +63,9 @@ namespace DynamicDb
 
 		public dynamic[] Update(string table, object values, params object[] criteria)
 		{
-			ExceptionHelper.ThrowIf(() => table == null, () => new ArgumentNullException(nameof(table)));
-			ExceptionHelper.ThrowIf(() => values == null, () => new ArgumentNullException(nameof(values)));
-			ExceptionHelper.ThrowIf(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
+			Throw.If(() => table == null, () => new ArgumentNullException(nameof(table)));
+			Throw.If(() => values == null, () => new ArgumentNullException(nameof(values)));
+			Throw.If(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
 
 			using (var command = this.CommandGenerator.GenerateUpdate(table, values, criteria))
 			{
@@ -75,8 +75,8 @@ namespace DynamicDb
 
 		public int Execute(string commandText, object parameters = null, CommandType commandType = CommandType.Text)
 		{
-			ExceptionHelper.ThrowIf(() => commandText == null, () => new ArgumentNullException(nameof(commandText)));
-			ExceptionHelper.ThrowIf(() => commandText.Length == 0, () => new ArgumentException("Command text was not provided.", nameof(commandText)));
+			Throw.If(() => commandText == null, () => new ArgumentNullException(nameof(commandText)));
+			Throw.If(() => commandText.Length == 0, () => new ArgumentException("Command text was not provided.", nameof(commandText)));
 			
 			using (var command = this.CommandGenerator.Generate(commandText, parameters, commandType))
 			{
@@ -88,8 +88,8 @@ namespace DynamicDb
 
 		public dynamic[] Query(string commandText, object parameters = null, CommandType commandType = CommandType.Text)
 		{
-			ExceptionHelper.ThrowIf(() => commandText == null, () => new ArgumentNullException(nameof(commandText)));
-			ExceptionHelper.ThrowIf(() => commandText.Length == 0, () => new ArgumentException("Command text was not provided.", nameof(commandText)));
+			Throw.If(() => commandText == null, () => new ArgumentNullException(nameof(commandText)));
+			Throw.If(() => commandText.Length == 0, () => new ArgumentException("Command text was not provided.", nameof(commandText)));
 
 			using (var command = this.CommandGenerator.Generate(commandText, parameters, commandType))
 			{
@@ -100,7 +100,7 @@ namespace DynamicDb
 		protected dynamic[] ExecuteReader(IDbCommand command, Func<RecordFactory, IDataReader, object> createRecord)
 		{
 			var records = new List<dynamic>();
-			var recordFactory = new RecordFactory(this.ConnectionString);
+			var recordFactory = RecordFactory.Create(this.ConnectionString);
 
 			command.Connection = this.Connection;
 

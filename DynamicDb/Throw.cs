@@ -2,9 +2,9 @@
 
 namespace DynamicDb
 {
-	public class ExceptionHelper
+	public class Throw
 	{
-		public static void ThrowIf(Func<bool> condition, Func<Exception> exceptionToThrow)
+		public static void If(Func<bool> condition, Func<Exception> exceptionToThrow)
 		{
 			if (condition())
 			{

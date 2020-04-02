@@ -4,6 +4,7 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace DynamicDb.Tests
@@ -1562,7 +1563,19 @@ namespace DynamicDb.Tests
 				dynamicDb.Query("dbo.UpdateAllAges", commandType: CommandType.StoredProcedure);
 			}
 		}
-		
+
+		[TestMethod]
+		public void Select_ParallelCallsWithDifferentDynamicDbObject_NoExceptionIsThrown()
+		{
+			Parallel.For(0, 10, i =>
+			{
+				using (var dynamicDb = new DynamicDb(DynamicDbTests.DbConnectionString))
+				{
+					var selectedRecords = dynamicDb.Select("dbo.Person", criteria: null);
+				}
+			});
+		}
+
 		internal static void InsertPersonRecords(dynamic[] records)
 		{
 			var commandText = new StringBuilder("INSERT dbo.Person (FirstName, LastName, MiddleInitial, Age, DateOfBirth, Gender) VALUES ");

@@ -1,29 +1,39 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Reflection;
 using System.Reflection.Emit;
 
 namespace DynamicDb
 {
-	public class RecordFactory
+	public sealed class RecordFactory
 	{
-		private static Dictionary<string, Cache> Caches = new Dictionary<string, Cache>();
-		private string databaseConnectionString;
+		private static Dictionary<SqlConnectionStringBuilder, Cache> Caches = new Dictionary<SqlConnectionStringBuilder, Cache>();
+		private SqlConnectionStringBuilder connectionStringBuilder;
 		private Cache cache;
 
-		public RecordFactory(string databaseConnectionString)
+		private RecordFactory(SqlConnectionStringBuilder connectionStringBuilder, Cache cache)
 		{
-			this.databaseConnectionString = databaseConnectionString;
-
-			if (!RecordFactory.Caches.TryGetValue(this.databaseConnectionString, out var cache))
-			{
-				cache = new Cache();
-
-				RecordFactory.Caches.Add(this.databaseConnectionString, cache);
-			}
-
+			this.connectionStringBuilder = connectionStringBuilder;
 			this.cache = cache;
+		}
+
+		public static RecordFactory Create(string connectionString)
+		{
+			lock (RecordFactory.Caches)
+			{
+				var connectionStringBuilder = new SqlConnectionStringBuilder(connectionString);
+
+				if (!RecordFactory.Caches.TryGetValue(connectionStringBuilder, out var cache))
+				{
+					cache = new Cache();
+
+					RecordFactory.Caches.Add(connectionStringBuilder, cache);
+				}
+
+				return new RecordFactory(connectionStringBuilder, cache);
+			}
 		}
 
 		public object Create(IDataReader dataReader, string table)
@@ -136,7 +146,7 @@ namespace DynamicDb
 
 		private string GenerateTypeName(string databaseObject)
 		{
-			return databaseObject.Replace('.', '_');
+			return $"{this.connectionStringBuilder.InitialCatalog}_{databaseObject.Replace('.', '_')}";
 		}
 
 		private string GenerateTypeName(IDbCommand command)
@@ -173,12 +183,51 @@ namespace DynamicDb
 
 		private class Cache
 		{
-			public Dictionary<string, Type> TableTypes { get; set; } = new Dictionary<string, Type>();
-			public Dictionary<string, Type> CommandTypes { get; set; } = new Dictionary<string, Type>();
-			public Dictionary<Type, Dictionary<string, PropertyInfo>> TypeProperties { get; set; } = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
-			public AssemblyName AssemblyName { get; set; }
-			public AssemblyBuilder AssemblyBuilder { get; set; }
-			public ModuleBuilder ModuleBuilder { get; set; }
+			private object syncObject = new object();
+			private Dictionary<string, Type> tableTypes = new Dictionary<string, Type>();
+			private Dictionary<string, Type> commandTypes = new Dictionary<string, Type>();
+			private Dictionary<Type, Dictionary<string, PropertyInfo>> typeProperties = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
+			private AssemblyName assemblyName;
+			private AssemblyBuilder assemblyBuilder;
+			private ModuleBuilder moduleBuilder;
+
+			public Dictionary<string, Type> TableTypes => this.SafeGet(() => this.tableTypes);
+			public Dictionary<string, Type> CommandTypes => this.SafeGet(() => this.commandTypes);
+			public Dictionary<Type, Dictionary<string, PropertyInfo>> TypeProperties => this.SafeGet(() => this.typeProperties);
+
+			public AssemblyName AssemblyName
+			{
+				get => this.SafeGet(() => this.assemblyName);
+				set => this.SafeSet(() => this.assemblyName = value);
+			}
+
+			public AssemblyBuilder AssemblyBuilder
+			{
+				get => this.SafeGet(() => this.assemblyBuilder);
+				set => this.SafeSet(() => this.assemblyBuilder = value);
+			}
+
+			public ModuleBuilder ModuleBuilder
+			{
+				get => this.SafeGet(() => this.moduleBuilder);
+				set => this.SafeSet(() => this.moduleBuilder = value);
+			}
+
+			private T SafeGet<T>(Func<T> get)
+			{
+				lock (this.syncObject)
+				{
+					return get();
+				}
+			}
+
+			private void SafeSet(Action set)
+			{
+				lock (this.syncObject)
+				{
+					set();
+				}
+			}
 		}
 	}
 }
