@@ -38,16 +38,22 @@ namespace DynamicDb
 
 		public object Create(IDataReader dataReader, string table)
 		{
-			var type = this.GetOrCreateType(dataReader, table);
+			lock (this.cache)
+			{
+				var type = this.GetOrCreateType(dataReader, table);
 
-			return this.CreateInstance(type, dataReader);
+				return this.CreateInstance(type, dataReader);
+			}
 		}
 
 		public object Create(IDataReader dataReader, IDbCommand command)
 		{
-			var type = this.GetOrCreateType(dataReader, command);
+			lock (this.cache)
+			{
+				var type = this.GetOrCreateType(dataReader, command);
 
-			return this.CreateInstance(type, dataReader);
+				return this.CreateInstance(type, dataReader);
+			}
 		}
 
 		private object CreateInstance(Type type, IDataReader dataReader)
@@ -183,51 +189,12 @@ namespace DynamicDb
 
 		private class Cache
 		{
-			private object syncObject = new object();
-			private Dictionary<string, Type> tableTypes = new Dictionary<string, Type>();
-			private Dictionary<string, Type> commandTypes = new Dictionary<string, Type>();
-			private Dictionary<Type, Dictionary<string, PropertyInfo>> typeProperties = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
-			private AssemblyName assemblyName;
-			private AssemblyBuilder assemblyBuilder;
-			private ModuleBuilder moduleBuilder;
-
-			public Dictionary<string, Type> TableTypes => this.SafeGet(() => this.tableTypes);
-			public Dictionary<string, Type> CommandTypes => this.SafeGet(() => this.commandTypes);
-			public Dictionary<Type, Dictionary<string, PropertyInfo>> TypeProperties => this.SafeGet(() => this.typeProperties);
-
-			public AssemblyName AssemblyName
-			{
-				get => this.SafeGet(() => this.assemblyName);
-				set => this.SafeSet(() => this.assemblyName = value);
-			}
-
-			public AssemblyBuilder AssemblyBuilder
-			{
-				get => this.SafeGet(() => this.assemblyBuilder);
-				set => this.SafeSet(() => this.assemblyBuilder = value);
-			}
-
-			public ModuleBuilder ModuleBuilder
-			{
-				get => this.SafeGet(() => this.moduleBuilder);
-				set => this.SafeSet(() => this.moduleBuilder = value);
-			}
-
-			private T SafeGet<T>(Func<T> get)
-			{
-				lock (this.syncObject)
-				{
-					return get();
-				}
-			}
-
-			private void SafeSet(Action set)
-			{
-				lock (this.syncObject)
-				{
-					set();
-				}
-			}
+			public Dictionary<string, Type> TableTypes { get; set; } = new Dictionary<string, Type>();
+			public Dictionary<string, Type> CommandTypes { get; set; } = new Dictionary<string, Type>();
+			public Dictionary<Type, Dictionary<string, PropertyInfo>> TypeProperties { get; set; } = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
+			public AssemblyName AssemblyName { get; set; }
+			public AssemblyBuilder AssemblyBuilder { get; set; }
+			public ModuleBuilder ModuleBuilder { get; set; }
 		}
 	}
 }
