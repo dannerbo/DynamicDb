@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Data.SqlClient;
 
 namespace DynamicDb
@@ -6,19 +7,27 @@ namespace DynamicDb
 	public class TestDb : DynamicDb
 	{
 		private Stack<RecordSet> insertedRecordsCache = new Stack<RecordSet>();
-		
-		public TestDb(string connectionString)
+		private bool rollbackOnDispose;
+		private SqlTransaction transaction;
+
+		public TestDb(string connectionString, bool rollbackOnDispose = false)
 			: base(connectionString)
 		{
+			this.rollbackOnDispose = rollbackOnDispose;
 		}
 
-		public TestDb(SqlConnection connection)
+		public TestDb(SqlConnection connection, bool rollbackOnDispose = false)
 			: base(connection)
 		{
+			this.rollbackOnDispose = rollbackOnDispose;
 		}
 
 		public dynamic[] Insert(string table, bool deleteOnDispose, params object[] records)
 		{
+			Throw.If(
+				() => deleteOnDispose && this.rollbackOnDispose,
+				() => new InvalidOperationException($"Argument '{nameof(deleteOnDispose)}' is expected to be 'false' when constructor argument '{nameof(this.rollbackOnDispose)}' is 'true'."));
+
 			var insertedRecords = this.Insert(table, records);
 
 			if (deleteOnDispose)
@@ -27,6 +36,18 @@ namespace DynamicDb
 			}
 
 			return insertedRecords;
+		}
+
+		protected override DbCommandGenerator CreateCommandGenerator()
+		{
+			if (this.rollbackOnDispose)
+			{
+				this.transaction = this.Connection.BeginTransaction();
+
+				return new DbCommandGenerator(this.TableMetadataProvider, new DbCommandFactory(this.transaction));
+			}
+
+			return base.CreateCommandGenerator();
 		}
 
 		protected virtual void DeleteInsertedRecords()
@@ -48,6 +69,14 @@ namespace DynamicDb
 		{
 			if (disposing)
 			{
+				if (this.rollbackOnDispose && this.transaction != null)
+				{
+					this.transaction.Rollback();
+					this.transaction.Dispose();
+
+					this.transaction = null;
+				}
+
 				if (this.insertedRecordsCache.Count > 0)
 				{
 					this.DeleteInsertedRecords();

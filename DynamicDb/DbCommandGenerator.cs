@@ -10,12 +10,19 @@ namespace DynamicDb
 {
 	public class DbCommandGenerator
 	{
-		public DbCommandGenerator(TableMetadataProvider tableMetadataProvider)
+		public DbCommandGenerator(TableMetadataProvider tableMetadataProvider, DbCommandFactory commandFactory)
 		{
 			this.TableMetadataProvider = tableMetadataProvider;
+			this.CommandFactory = commandFactory;
+		}
+
+		public DbCommandGenerator(TableMetadataProvider tableMetadataProvider)
+			: this(tableMetadataProvider, new DbCommandFactory())
+		{
 		}
 
 		protected TableMetadataProvider TableMetadataProvider { get; private set; }
+		protected DbCommandFactory CommandFactory { get; private set; }
 
 		public SqlCommand GenerateInsert(string table, params object[] records)
 		{
@@ -50,14 +57,7 @@ namespace DynamicDb
 				commandTextStringBuilder.AppendLine(joinTableToTempTable);
 			}
 
-			var command = new SqlCommand(commandTextStringBuilder.ToString());
-
-			if (parameters?.Length > 0)
-			{
-				command.Parameters.AddRange(parameters);
-			}
-
-			return command;
+			return this.CommandFactory.Create(commandTextStringBuilder.ToString(), CommandType.Text, parameters);
 		}
 
 		public SqlCommand GenerateSelect(string table, params object[] criteria)
@@ -80,15 +80,8 @@ namespace DynamicDb
 					commandTextStringBuilder.AppendLine($"WHERE {whereConditions}");
 				}
 			}
-			
-			var command = new SqlCommand(commandTextStringBuilder.ToString());
 
-			if (parameters?.Length > 0)
-			{
-				command.Parameters.AddRange(parameters);
-			}
-
-			return command;
+			return this.CommandFactory.Create(commandTextStringBuilder.ToString(), CommandType.Text, parameters);
 		}
 
 		public SqlCommand GenerateDelete(string table, params object[] criteria)
@@ -98,14 +91,9 @@ namespace DynamicDb
 			
 			SqlParameter[] parameters = null;
 			var whereConditions = criteria?.Length > 0 ? this.GenerateWhereConditions(criteria, out parameters) : null;
-			var command = this.GenerateDelete(table, whereConditions);
+			var commandText = this.GenerateDeleteCommandText(table, whereConditions);
 
-			if (parameters?.Length > 0)
-			{
-				command.Parameters.AddRange(parameters);
-			}
-
-			return command;
+			return this.CommandFactory.Create(commandText, CommandType.Text, parameters);
 		}
 
 		public SqlCommand GenerateDeleteByPrimaryKeys(string table, object[] records)
@@ -123,11 +111,9 @@ namespace DynamicDb
 				? this.GenerateWhereConditions(records, field => primaryKeyColumns.Contains(field), out parameters)
 				: this.GenerateWhereConditions(records, out parameters);
 
-			var command = this.GenerateDelete(table, whereConditions);
-			
-			command.Parameters.AddRange(parameters);
+			var commandText = this.GenerateDeleteCommandText(table, whereConditions);
 
-			return command;
+			return this.CommandFactory.Create(commandText, CommandType.Text, parameters);
 		}
 		
 		public SqlCommand GenerateUpdate(string table, object values, params object[] criteria)
@@ -174,16 +160,11 @@ namespace DynamicDb
 				commandTextStringBuilder.AppendLine(joinTableToTempTable);
 			}
 
-			var command = new SqlCommand(commandTextStringBuilder.ToString());
+			var parameters = whereParameters?.Length > 0
+				? setParameters.Union(whereParameters)
+				: setParameters;
 
-			command.Parameters.AddRange(setParameters);
-
-			if (whereParameters?.Length > 0)
-			{
-				command.Parameters.AddRange(whereParameters);
-			}
-
-			return command;
+			return this.CommandFactory.Create(commandTextStringBuilder.ToString(), CommandType.Text, parameters.ToArray());
 		}
 
 		public SqlCommand Generate(string commandText, object parameters, CommandType commandType)
@@ -191,11 +172,11 @@ namespace DynamicDb
 			Throw.If(() => commandText == null, () => new ArgumentNullException(nameof(commandText)));
 			Throw.If(() => commandText.Length == 0, () => new ArgumentException("Command text was not provided.", nameof(commandText)));
 
-			List<IDbDataParameter> parameterList = null;
+			List<SqlParameter> parameterList = null;
 
 			if (parameters != null)
 			{
-				parameterList = new List<IDbDataParameter>();
+				parameterList = new List<SqlParameter>();
 
 				var properties = parameters.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
@@ -207,19 +188,10 @@ namespace DynamicDb
 				}
 			}
 
-			var command = new SqlCommand(commandText);
-
-			command.CommandType = commandType;
-
-			if (parameterList != null)
-			{
-				command.Parameters.AddRange(parameterList.ToArray());
-			}
-
-			return command;
+			return this.CommandFactory.Create(commandText, commandType, parameterList?.ToArray());
 		}
 
-		protected SqlCommand GenerateDelete(string table, string whereConditions)
+		protected string GenerateDeleteCommandText(string table, string whereConditions)
 		{
 			this.GenerateOutputTempTableArtifacts(
 				table,
@@ -244,7 +216,7 @@ namespace DynamicDb
 				.AppendLine()
 				.AppendLine(selectFromTempTable);
 
-			return new SqlCommand(commandTextStringBuilder.ToString());
+			return commandTextStringBuilder.ToString();
 		}
 
 		protected string GenerateDelimitedColumnDefinitions(IEnumerable<SqlColumn> columns)

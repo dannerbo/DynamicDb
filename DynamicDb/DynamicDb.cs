@@ -115,7 +115,17 @@ namespace DynamicDb
 			return records.ToArray();
 		}
 
-		protected virtual SqlConnection GetOrCreateConnection()
+		protected virtual TableMetadataProvider CreateTableMetadataProvider()
+		{
+			return new TableMetadataProvider(this.Connection);
+		}
+
+		protected virtual DbCommandGenerator CreateCommandGenerator()
+		{
+			return new DbCommandGenerator(this.TableMetadataProvider);
+		}
+
+		private SqlConnection GetOrCreateConnection()
 		{
 			if (this.connection == null)
 			{
@@ -130,14 +140,14 @@ namespace DynamicDb
 			return this.connection;
 		}
 
-		protected virtual TableMetadataProvider GetOrCreateTableMetadataProvider()
+		private TableMetadataProvider GetOrCreateTableMetadataProvider()
 		{
-			return this.tableMetadataProvider ?? (this.tableMetadataProvider = new TableMetadataProvider(this.Connection));
+			return this.tableMetadataProvider ?? (this.tableMetadataProvider = this.CreateTableMetadataProvider());
 		}
 
-		protected virtual DbCommandGenerator GetOrCreateCommandGenerator()
+		private DbCommandGenerator GetOrCreateCommandGenerator()
 		{
-			return this.commandGenerator ?? (this.commandGenerator = new DbCommandGenerator(this.TableMetadataProvider));
+			return this.commandGenerator ?? (this.commandGenerator = this.CreateCommandGenerator());
 		}
 
 		public void Dispose()
