@@ -307,7 +307,6 @@ public void Insert_InsertAddressForExistingPerson_AddressIsInserted()
     // rollbackWithTransactionScope argument is used to rollback all db changes when TestDb object is disposed
     using (var testDb = new TestDb(connectionStringOrConnectionForUnitTestUser, rollbackWithTransactionScope: true))
     {
-        // Insert temporary dbo.Person record that will be referenced by the dbo.Address record that we're going to insert via the repository
         var person = testDb.Insert("dbo.Person",
             new
             {
@@ -321,26 +320,81 @@ public void Insert_InsertAddressForExistingPerson_AddressIsInserted()
 
         var address = new Models.Address()
         {
-            PersonId = person.Id, // Auto-identity from inserted dbo.Person record above
+            PersonId = person.Id,
             Street = "123 Fake St.",
             City = "Nuketown",
             State = "WI",
             ZipCode = "51234"
         };
 
-        // Connection or connection string should be for the app user so permissions can be tested
         var addressRepository = new AddressRepository(connectionStringOrConnectionForAppUser);
         
         addressRepository.Insert(address);
         
-        // Select the record we expect to have been inserted
         var addressRecord = testDb.Select("dbo.Address", new { PersonId = person.Id }).Single();
         
         Assert.AreEqual(address.Street, addressRecord.Street);
         Assert.AreEqual(address.City, addressRecord.City);
         Assert.AreEqual(address.State, addressRecord.State);
         Assert.AreEqual(address.ZipCode, addressRecord.ZipCode);
-        Assert.IsNull(addressRecord.Apt); // This field was not provided so it should be NULL
+        Assert.IsNull(addressRecord.Apt);
     }
+}
+```
+
+### Write a unit test for a DAL repository with user-defined TestDb extension methods
+
+In this example we use user-defined **TestDb** extension methods for better code re-use and unit test readability.  The **Address** model generation and assertions could also be moved to separate methods for re-use and readability.
+
+```csharp
+[TestMethod]
+public void Insert_InsertAddressForExistingPerson_AddressIsInserted()
+{
+    using (var testDb = new TestDb(connectionStringOrConnectionForUnitTestUser, rollbackWithTransactionScope: true))
+    {
+        // Insert temporary dbo.Person record with extension method
+        var person = testDb.InsertPerson();
+
+        var address = new Models.Address()
+        {
+            PersonId = person.Id,
+            Street = "123 Fake St.",
+            City = "Nuketown",
+            State = "WI",
+            ZipCode = "51234"
+        };
+
+        var addressRepository = new AddressRepository(connectionStringOrConnectionForAppUser);
+        
+        addressRepository.Insert(address);
+        
+        // Select the record we expect to have been inserted with extension method
+        var addressRecord = testDb.SelectAddress(person.Id);
+        
+        Assert.AreEqual(address.Street, addressRecord.Street);
+        Assert.AreEqual(address.City, addressRecord.City);
+        Assert.AreEqual(address.State, addressRecord.State);
+        Assert.AreEqual(address.ZipCode, addressRecord.ZipCode);
+        Assert.IsNull(addressRecord.Apt);
+    }
+}
+
+public static dynamic InsertPerson(this TestDb testDb)
+{
+	return testDb.Insert("dbo.Person",
+		new
+		{
+			FirstName = "John",
+			LastName = "Doe",
+			MiddleInitial = "A",
+			Age = 50,
+			DateOfBirth = DateTime.Parse("2000-01-01"),
+			Gender = Gender.Male
+		}).Single();
+}
+
+public static dynamic SelectAddress(this TestDb testDb, long personId)
+{
+	return testDb.Select("dbo.Address", new { PersonId = personId }).Single();
 }
 ```
