@@ -14,20 +14,6 @@ namespace DynamicDb.Tests
 	{
 		internal static readonly string DbConnectionString = ConfigurationManager.ConnectionStrings["UnitTesting"].ConnectionString;
 		internal const string NonExistantDbConnectionString = "Data Source=localhost;Initial Catalog=NonExistant;Integrated Security=true;";
-		internal static SqlConnection DbConnection;
-
-		[ClassInitialize]
-		public static void ClassInitialize(TestContext testContext)
-		{
-			DynamicDbTests.DbConnection = new SqlConnection(DynamicDbTests.DbConnectionString);
-			DynamicDbTests.DbConnection.Open();
-		}
-
-		[ClassCleanup]
-		public static void ClassCleanup()
-		{
-			DynamicDbTests.DbConnection.Dispose();
-		}
 
 		[TestCleanup]
 		public void TestCleanup()
@@ -1629,9 +1615,14 @@ namespace DynamicDb.Tests
 					.Append($"{records[i].Age}, '{records[i].DateOfBirth}', {(byte)records[i].Gender})");
 			}
 
-			using (var command = new SqlCommand(commandText.ToString(), DynamicDbTests.DbConnection))
+			using (var connection = new SqlConnection(DynamicDbTests.DbConnectionString))
 			{
-				command.ExecuteNonQuery();
+				connection.Open();
+				
+				using (var command = new SqlCommand(commandText.ToString(), connection))
+				{
+					command.ExecuteNonQuery();
+				}
 			}
 		}
 
@@ -1651,9 +1642,14 @@ namespace DynamicDb.Tests
 					.Append($"'{records[i].City}', '{records[i].State}', '{records[i].ZipCode}')");
 			}
 
-			using (var command = new SqlCommand(commandText.ToString(), DynamicDbTests.DbConnection))
+			using (var connection = new SqlConnection(DynamicDbTests.DbConnectionString))
 			{
-				command.ExecuteNonQuery();
+				connection.Open();
+
+				using (var command = new SqlCommand(commandText.ToString(), connection))
+				{
+					command.ExecuteNonQuery();
+				}
 			}
 		}
 
@@ -1664,18 +1660,23 @@ namespace DynamicDb.Tests
 				var commandText = new StringBuilder($"SELECT 1 FROM dbo.Person WHERE FirstName = '{records[i].FirstName}' AND LastName = '{records[i].LastName}' AND ")
 					.Append(records[i].MiddleInitial != null ? $"MiddleInitial = '{records[i].MiddleInitial}' AND " : "MiddleInitial IS NULL AND ")
 					.Append($"Age = {records[i].Age} AND DateOfBirth = '{records[i].DateOfBirth}' AND Gender = {(byte)records[i].Gender}");
-				
-				using (var command = new SqlCommand(commandText.ToString(), DynamicDbTests.DbConnection))
-				using (var reader = command.ExecuteReader())
+
+				using (var connection = new SqlConnection(DynamicDbTests.DbConnectionString))
 				{
-					var recordCount = 0;
+					connection.Open();
 
-					while (reader.Read())
+					using (var command = new SqlCommand(commandText.ToString(), connection))
+					using (var reader = command.ExecuteReader())
 					{
-						recordCount++;
-					}
+						var recordCount = 0;
 
-					Assert.AreEqual(1, recordCount);
+						while (reader.Read())
+						{
+							recordCount++;
+						}
+
+						Assert.AreEqual(1, recordCount);
+					}
 				}
 			}
 		}
@@ -1696,17 +1697,22 @@ namespace DynamicDb.Tests
 
 			commandText.Append(")");
 
-			using (var command = new SqlCommand(commandText.ToString(), DynamicDbTests.DbConnection))
-			using (var reader = command.ExecuteReader())
+			using (var connection = new SqlConnection(DynamicDbTests.DbConnectionString))
 			{
-				var recordCount = 0;
+				connection.Open();
 
-				while (reader.Read())
+				using (var command = new SqlCommand(commandText.ToString(), connection))
+				using (var reader = command.ExecuteReader())
 				{
-					recordCount++;
-				}
+					var recordCount = 0;
 
-				Assert.AreEqual(ids.Length, recordCount);
+					while (reader.Read())
+					{
+						recordCount++;
+					}
+
+					Assert.AreEqual(ids.Length, recordCount);
+				}
 			}
 		}
 
@@ -1726,17 +1732,22 @@ namespace DynamicDb.Tests
 
 			commandText.Append(")");
 
-			using (var command = new SqlCommand(commandText.ToString(), DynamicDbTests.DbConnection))
-			using (var reader = command.ExecuteReader())
+			using (var connection = new SqlConnection(DynamicDbTests.DbConnectionString))
 			{
-				var recordCount = 0;
+				connection.Open();
 
-				while (reader.Read())
+				using (var command = new SqlCommand(commandText.ToString(), connection))
+				using (var reader = command.ExecuteReader())
 				{
-					recordCount++;
-				}
+					var recordCount = 0;
 
-				Assert.AreEqual(0, recordCount);
+					while (reader.Read())
+					{
+						recordCount++;
+					}
+
+					Assert.AreEqual(0, recordCount);
+				}
 			}
 		}
 
@@ -1775,17 +1786,22 @@ namespace DynamicDb.Tests
 
 			commandText.Append(")");
 
-			using (var command = new SqlCommand(commandText.ToString(), DynamicDbTests.DbConnection))
-			using (var reader = command.ExecuteReader())
+			using (var connection = new SqlConnection(DynamicDbTests.DbConnectionString))
 			{
-				var recordCount = 0;
+				connection.Open();
 
-				while (reader.Read())
+				using (var command = new SqlCommand(commandText.ToString(), connection))
+				using (var reader = command.ExecuteReader())
 				{
-					recordCount++;
-				}
+					var recordCount = 0;
 
-				Assert.AreEqual(0, recordCount);
+					while (reader.Read())
+					{
+						recordCount++;
+					}
+
+					Assert.AreEqual(0, recordCount);
+				}
 			}
 		}
 

@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace DynamicDb
 {
-	public class TableMetadataProvider
+	public class TableMetadataProvider : ITableMetadataProvider
 	{
 		protected static Dictionary<string, Cache> Caches = new Dictionary<string, Cache>();
 

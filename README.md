@@ -75,7 +75,7 @@ using (var dynamicDb = new DynamicDb(connectionStringOrConnection))
 
     foreach (var record in records)
     {
-        // **Id** field is an auto-identity and **CreatedDate** has a default value defined in the database
+        // Id field is an auto-identity and CreatedDate has a default value defined in the database
         Console.WriteLine($"{record.Id}, {record.FirstName}, {record.LastName}, {record.CreatedDate}");
     }
 }
@@ -286,6 +286,55 @@ public void Insert_InsertAddressForExistingPerson_AddressIsInserted()
         
         // Delete and return the record we expect to have been inserted
         var addressRecord = testDb.Delete("dbo.Address", new { PersonId = person.Id }).Single();
+        
+        Assert.AreEqual(address.Street, addressRecord.Street);
+        Assert.AreEqual(address.City, addressRecord.City);
+        Assert.AreEqual(address.State, addressRecord.State);
+        Assert.AreEqual(address.ZipCode, addressRecord.ZipCode);
+        Assert.IsNull(addressRecord.Apt); // This field was not provided so it should be NULL
+    }
+}
+```
+
+### Write a unit test for a DAL repository that rolls back all db changes on disposal
+
+Like the previous example, we will write a unit test to verify an **Insert** method for a repository which requires a foreign record is inserting records correctly.  The difference being that this example tells **TestDb** to use a **TransactionScope** to rollback any changes when the **TestDb** object is disposed.  Make notice that **true** is no longer specified for the **deleteOnDispose** argument to the **Insert** method.  Also, we no longer use the **Delete** method to delete the data inserted by the DAL repository since the data won't be committed.
+
+```csharp
+[TestMethod]
+public void Insert_InsertAddressForExistingPerson_AddressIsInserted()
+{
+    // rollbackWithTransactionScope argument is used to rollback all db changes when TestDb object is disposed
+    using (var testDb = new TestDb(connectionStringOrConnectionForUnitTestUser, rollbackWithTransactionScope: true))
+    {
+        // Insert temporary dbo.Person record that will be referenced by the dbo.Address record that we're going to insert via the repository
+        var person = testDb.Insert("dbo.Person",
+            new
+            {
+                FirstName = "John",
+                LastName = "Doe",
+                MiddleInitial = "A",
+                Age = 50,
+                DateOfBirth = DateTime.Parse("2000-01-01"),
+                Gender = Gender.Male
+            }).Single();
+
+        var address = new Models.Address()
+        {
+            PersonId = person.Id, // Auto-identity from inserted dbo.Person record above
+            Street = "123 Fake St.",
+            City = "Nuketown",
+            State = "WI",
+            ZipCode = "51234"
+        };
+
+        // Connection or connection string should be for the app user so permissions can be tested
+        var addressRepository = new AddressRepository(connectionStringOrConnectionForAppUser);
+        
+        addressRepository.Insert(address);
+        
+        // Select the record we expect to have been inserted
+        var addressRecord = testDb.Select("dbo.Address", new { PersonId = person.Id }).Single();
         
         Assert.AreEqual(address.Street, addressRecord.Street);
         Assert.AreEqual(address.City, addressRecord.City);

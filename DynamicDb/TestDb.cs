@@ -1,15 +1,21 @@
 ﻿using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Transactions;
 
 namespace DynamicDb
 {
 	public class TestDb : DynamicDb
 	{
 		private Stack<RecordSet> insertedRecordsCache = new Stack<RecordSet>();
-		
-		public TestDb(string connectionString)
+		private TransactionScope transactionScope;
+
+		public TestDb(string connectionString, bool rollbackWithTransactionScope = false)
 			: base(connectionString)
 		{
+			if (rollbackWithTransactionScope)
+			{
+				this.transactionScope = new TransactionScope();
+			}
 		}
 
 		public TestDb(SqlConnection connection)
@@ -51,6 +57,13 @@ namespace DynamicDb
 				if (this.insertedRecordsCache.Count > 0)
 				{
 					this.DeleteInsertedRecords();
+				}
+
+				if (this.transactionScope != null)
+				{
+					this.transactionScope.Dispose();
+
+					this.transactionScope = null;
 				}
 			}
 

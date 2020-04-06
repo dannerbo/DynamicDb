@@ -8,14 +8,21 @@ using System.Text;
 
 namespace DynamicDb
 {
-	public class DbCommandGenerator
+	public class DbCommandGenerator : IDbCommandGenerator
 	{
-		public DbCommandGenerator(TableMetadataProvider tableMetadataProvider)
+		public DbCommandGenerator(ITableMetadataProvider tableMetadataProvider, IDbCommandFactory commandFactory)
 		{
 			this.TableMetadataProvider = tableMetadataProvider;
+			this.CommandFactory = commandFactory;
 		}
 
-		protected TableMetadataProvider TableMetadataProvider { get; private set; }
+		public DbCommandGenerator(ITableMetadataProvider tableMetadataProvider)
+			: this(tableMetadataProvider, new DbCommandFactory())
+		{
+		}
+
+		protected ITableMetadataProvider TableMetadataProvider { get; private set; }
+		protected IDbCommandFactory CommandFactory { get; private set; }
 
 		public SqlCommand GenerateInsert(string table, params object[] records)
 		{
@@ -50,14 +57,7 @@ namespace DynamicDb
 				commandTextStringBuilder.AppendLine(joinTableToTempTable);
 			}
 
-			var command = new SqlCommand(commandTextStringBuilder.ToString());
-
-			if (parameters?.Length > 0)
-			{
-				command.Parameters.AddRange(parameters);
-			}
-
-			return command;
+			return this.CommandFactory.Create(commandTextStringBuilder.ToString(), CommandType.Text, parameters);
 		}
 
 		public SqlCommand GenerateSelect(string table, params object[] criteria)
@@ -80,32 +80,20 @@ namespace DynamicDb
 					commandTextStringBuilder.AppendLine($"WHERE {whereConditions}");
 				}
 			}
-			
-			var command = new SqlCommand(commandTextStringBuilder.ToString());
 
-			if (parameters?.Length > 0)
-			{
-				command.Parameters.AddRange(parameters);
-			}
-
-			return command;
+			return this.CommandFactory.Create(commandTextStringBuilder.ToString(), CommandType.Text, parameters);
 		}
 
 		public SqlCommand GenerateDelete(string table, params object[] criteria)
 		{
 			Throw.If(() => table == null, () => new ArgumentNullException(nameof(table)));
 			Throw.If(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
-			
+
 			SqlParameter[] parameters = null;
 			var whereConditions = criteria?.Length > 0 ? this.GenerateWhereConditions(criteria, out parameters) : null;
-			var command = this.GenerateDelete(table, whereConditions);
+			var commandText = this.GenerateDeleteCommandText(table, whereConditions);
 
-			if (parameters?.Length > 0)
-			{
-				command.Parameters.AddRange(parameters);
-			}
-
-			return command;
+			return this.CommandFactory.Create(commandText, CommandType.Text, parameters);
 		}
 
 		public SqlCommand GenerateDeleteByPrimaryKeys(string table, object[] records)
@@ -114,7 +102,7 @@ namespace DynamicDb
 			Throw.If(() => table.Length == 0, () => new ArgumentException("Table name was not provided.", nameof(table)));
 			Throw.If(() => records == null, () => new ArgumentNullException(nameof(records)));
 			Throw.If(() => records.Length == 0, () => new ArgumentException("Records were not provided.", nameof(records)));
-			
+
 			var primaryKeyColumns = this.TableMetadataProvider.GetColumnDefinitions(table).Where(x => x.IsPrimaryKey).Select(x => x.Name);
 
 			SqlParameter[] parameters;
@@ -123,13 +111,11 @@ namespace DynamicDb
 				? this.GenerateWhereConditions(records, field => primaryKeyColumns.Contains(field), out parameters)
 				: this.GenerateWhereConditions(records, out parameters);
 
-			var command = this.GenerateDelete(table, whereConditions);
-			
-			command.Parameters.AddRange(parameters);
+			var commandText = this.GenerateDeleteCommandText(table, whereConditions);
 
-			return command;
+			return this.CommandFactory.Create(commandText, CommandType.Text, parameters);
 		}
-		
+
 		public SqlCommand GenerateUpdate(string table, object values, params object[] criteria)
 		{
 			Throw.If(() => table == null, () => new ArgumentNullException(nameof(table)));
@@ -174,16 +160,11 @@ namespace DynamicDb
 				commandTextStringBuilder.AppendLine(joinTableToTempTable);
 			}
 
-			var command = new SqlCommand(commandTextStringBuilder.ToString());
+			var parameters = whereParameters?.Length > 0
+				? setParameters.Union(whereParameters)
+				: setParameters;
 
-			command.Parameters.AddRange(setParameters);
-
-			if (whereParameters?.Length > 0)
-			{
-				command.Parameters.AddRange(whereParameters);
-			}
-
-			return command;
+			return this.CommandFactory.Create(commandTextStringBuilder.ToString(), CommandType.Text, parameters.ToArray());
 		}
 
 		public SqlCommand Generate(string commandText, object parameters, CommandType commandType)
@@ -191,11 +172,11 @@ namespace DynamicDb
 			Throw.If(() => commandText == null, () => new ArgumentNullException(nameof(commandText)));
 			Throw.If(() => commandText.Length == 0, () => new ArgumentException("Command text was not provided.", nameof(commandText)));
 
-			List<IDbDataParameter> parameterList = null;
+			List<SqlParameter> parameterList = null;
 
 			if (parameters != null)
 			{
-				parameterList = new List<IDbDataParameter>();
+				parameterList = new List<SqlParameter>();
 
 				var properties = parameters.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
@@ -207,19 +188,10 @@ namespace DynamicDb
 				}
 			}
 
-			var command = new SqlCommand(commandText);
-
-			command.CommandType = commandType;
-
-			if (parameterList != null)
-			{
-				command.Parameters.AddRange(parameterList.ToArray());
-			}
-
-			return command;
+			return this.CommandFactory.Create(commandText, commandType, parameterList?.ToArray());
 		}
 
-		protected SqlCommand GenerateDelete(string table, string whereConditions)
+		protected string GenerateDeleteCommandText(string table, string whereConditions)
 		{
 			this.GenerateOutputTempTableArtifacts(
 				table,
@@ -244,7 +216,7 @@ namespace DynamicDb
 				.AppendLine()
 				.AppendLine(selectFromTempTable);
 
-			return new SqlCommand(commandTextStringBuilder.ToString());
+			return commandTextStringBuilder.ToString();
 		}
 
 		protected string GenerateDelimitedColumnDefinitions(IEnumerable<SqlColumn> columns)
@@ -279,36 +251,36 @@ namespace DynamicDb
 					case "TINYINT":
 					case "UNIQUEIDENTIFIER":
 					case "XML":
-					{
-						delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}");
+						{
+							delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}");
 
-						break;
-					}
+							break;
+						}
 
 					case "DECIMAL":
 					case "NUMERIC":
-					{
-						delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({column.Precision}, {column.Scale})");
+						{
+							delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({column.Precision}, {column.Scale})");
 
-						break;
-					}
+							break;
+						}
 
 					case "DATETIME2":
 					case "DATETIMEOFFSET":
 					case "FLOAT":
 					case "REAL":
-					{
-						delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({column.Precision})");
+						{
+							delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({column.Precision})");
 
-						break;
-					}
+							break;
+						}
 
 					case "TIME":
-					{
-						delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({column.Scale})");
+						{
+							delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({column.Scale})");
 
-						break;
-					}
+							break;
+						}
 
 					case "BINARY":
 					case "CHAR":
@@ -316,18 +288,18 @@ namespace DynamicDb
 					case "NVARCHAR":
 					case "VARBINARY":
 					case "VARCHAR":
-					{
-						var columnMaximumLength = column.MaximumLength == -1 ? "MAX" : column.MaximumLength.ToString();
+						{
+							var columnMaximumLength = column.MaximumLength == -1 ? "MAX" : column.MaximumLength.ToString();
 
-						delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({columnMaximumLength})");
+							delimitedColumnDefinitions.Append($"[{column.Name}] {dataType}({columnMaximumLength})");
 
-						break;
-					}
+							break;
+						}
 
 					default:
-					{
-						throw new NotSupportedException($"Column type '{dataType}' not supported.");
-					}
+						{
+							throw new NotSupportedException($"Column type '{dataType}' not supported.");
+						}
 				}
 			}
 

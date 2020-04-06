@@ -8,8 +8,8 @@ namespace DynamicDb
 	public class DynamicDb : IDisposable
 	{
 		private SqlConnection connection;
-		private DbCommandGenerator commandGenerator;
-		private TableMetadataProvider tableMetadataProvider;
+		private IDbCommandGenerator commandGenerator;
+		private ITableMetadataProvider tableMetadataProvider;
 
 		public DynamicDb(string connectionString)
 		{
@@ -23,8 +23,8 @@ namespace DynamicDb
 
 		protected string ConnectionString { get; private set; }
 		protected SqlConnection Connection => this.GetOrCreateConnection();
-		protected TableMetadataProvider TableMetadataProvider => this.GetOrCreateTableMetadataProvider();
-		protected DbCommandGenerator CommandGenerator => this.GetOrCreateCommandGenerator();
+		protected ITableMetadataProvider TableMetadataProvider => this.GetOrCreateTableMetadataProvider();
+		protected IDbCommandGenerator CommandGenerator => this.GetOrCreateCommandGenerator();
 
 		public dynamic[] Insert(string table, params object[] records)
 		{
@@ -115,7 +115,17 @@ namespace DynamicDb
 			return records.ToArray();
 		}
 
-		protected virtual SqlConnection GetOrCreateConnection()
+		protected virtual ITableMetadataProvider CreateTableMetadataProvider()
+		{
+			return new TableMetadataProvider(this.Connection);
+		}
+
+		protected virtual IDbCommandGenerator CreateCommandGenerator()
+		{
+			return new DbCommandGenerator(this.TableMetadataProvider);
+		}
+
+		private SqlConnection GetOrCreateConnection()
 		{
 			if (this.connection == null)
 			{
@@ -130,14 +140,14 @@ namespace DynamicDb
 			return this.connection;
 		}
 
-		protected virtual TableMetadataProvider GetOrCreateTableMetadataProvider()
+		private ITableMetadataProvider GetOrCreateTableMetadataProvider()
 		{
-			return this.tableMetadataProvider ?? (this.tableMetadataProvider = new TableMetadataProvider(this.Connection));
+			return this.tableMetadataProvider ?? (this.tableMetadataProvider = this.CreateTableMetadataProvider());
 		}
 
-		protected virtual DbCommandGenerator GetOrCreateCommandGenerator()
+		private IDbCommandGenerator GetOrCreateCommandGenerator()
 		{
-			return this.commandGenerator ?? (this.commandGenerator = new DbCommandGenerator(this.TableMetadataProvider));
+			return this.commandGenerator ?? (this.commandGenerator = this.CreateCommandGenerator());
 		}
 
 		public void Dispose()
