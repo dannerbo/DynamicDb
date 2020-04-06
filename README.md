@@ -381,20 +381,20 @@ public void Insert_InsertAddressForExistingPerson_AddressIsInserted()
 
 public static dynamic InsertPerson(this TestDb testDb)
 {
-	return testDb.Insert("dbo.Person",
-		new
-		{
-			FirstName = "John",
-			LastName = "Doe",
-			MiddleInitial = "A",
-			Age = 50,
-			DateOfBirth = DateTime.Parse("2000-01-01"),
-			Gender = Gender.Male
-		}).Single();
+    return testDb.Insert("dbo.Person",
+        new
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            MiddleInitial = "A",
+            Age = 50,
+            DateOfBirth = DateTime.Parse("2000-01-01"),
+            Gender = Gender.Male
+        }).Single();
 }
 
 public static dynamic SelectAddress(this TestDb testDb, long personId)
 {
-	return testDb.Select("dbo.Address", new { PersonId = personId }).Single();
+    return testDb.Select("dbo.Address", new { PersonId = personId }).Single();
 }
 ```
