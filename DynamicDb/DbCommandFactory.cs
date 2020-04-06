@@ -3,17 +3,8 @@ using System.Data.SqlClient;
 
 namespace DynamicDb
 {
-	public class DbCommandFactory
+	public class DbCommandFactory : IDbCommandFactory
 	{
-		public DbCommandFactory(SqlTransaction transaction)
-		{
-			this.Transaction = transaction;
-		}
-
-		public DbCommandFactory()
-		{
-		}
-
 		public SqlTransaction Transaction { get; set; }
 
 		public virtual SqlCommand Create(string commandText, CommandType commandType, SqlParameter[] parameters)
@@ -25,11 +16,6 @@ namespace DynamicDb
 			if (parameters?.Length > 0)
 			{
 				command.Parameters.AddRange(parameters);
-			}
-
-			if (this.Transaction != null)
-			{
-				command.Transaction = this.Transaction;
 			}
 
 			return command;

@@ -34,6 +34,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Transactions" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -45,6 +46,9 @@
     <Compile Include="DbCommandFactory.cs" />
     <Compile Include="DbCommandGenerator.cs" />
     <Compile Include="DynamicDb.cs" />
+    <Compile Include="IDbCommandFactory.cs" />
+    <Compile Include="IDbCommandGenerator.cs" />
+    <Compile Include="ITableMetadataProvider.cs" />
     <Compile Include="Throw.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RecordFactory.cs" />
